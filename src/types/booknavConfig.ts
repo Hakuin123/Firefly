@@ -6,10 +6,11 @@ export type BooknavItem = {
 	url: string; // 书签地址
 	desc?: string; // 书签描述
 	// 图标，留空则自动获取目标站点的 favicon
-	// 支持三种写法：
+	// 支持四种写法：
 	// 1. 网络图片：https://example.com/logo.png
 	// 2. public 目录图片：/assets/images/xxx.png
-	// 3. astro-icon 图标名：fa7-brands:github
+	// 3. src 目录图片（自动优化）：assets/images/xxx.png
+	// 4. astro-icon 图标名：fa7-brands:github
 	icon?: string;
 	weight?: number; // 组内权重，数字越大排序越靠前，默认 0
 	enabled?: boolean; // 是否启用，默认 true

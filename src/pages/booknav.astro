@@ -1,4 +1,7 @@
 ---
+import { Image } from "astro:assets";
+import * as path from "node:path";
+import type { ImageMetadata } from "astro";
 import { Icon } from "astro-icon/components";
 import { booknavPageConfig, siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
@@ -19,16 +22,50 @@ if (!siteConfig.pages.booknav) {
 // 使用配置文件中的书签数据，按权重排序
 const groups = getEnabledBooknavGroups();
 
+// src 目录下的本地图片交给 Astro 优化，public 目录和网络图片直接用原地址
+const imageFiles = import.meta.glob<ImageMetadata>(
+	"../**/*.{png,jpg,jpeg,webp,avif,gif,svg}",
+	{ import: "default" },
+);
+
+// 解析 src 目录下的本地图片路径（如 assets/images/logo.webp）为 ImageMetadata，失败返回 null
+async function resolveLocalIcon(value: string): Promise<ImageMetadata | null> {
+	if (!value || value.startsWith("/") || value.startsWith("http")) {
+		return null;
+	}
+	const normalizedPath = path
+		.normalize(path.join("../", value))
+		.replace(/\\/g, "/");
+	const file = imageFiles[normalizedPath];
+	return file ? await file() : null;
+}
+
 // 预先解析每个书签的图标与域名，避免在模板里重复计算
-const resolvedGroups = groups.map((group) => ({
-	...group,
-	items: group.items.map((item) => ({
-		...item,
-		domain: getBooknavDomain(item.url),
-		letter: getBooknavLetter(item.title),
-		resolvedIcon: resolveBooknavIcon(item, booknavPageConfig.favicon),
+const resolvedGroups = await Promise.all(
+	groups.map(async (group) => ({
+		...group,
+		items: await Promise.all(
+			group.items.map(async (item) => {
+				const resolvedIcon = resolveBooknavIcon(
+					item,
+					booknavPageConfig.favicon,
+				);
+				// icon 为 src 目录相对路径时解析为 Astro 优化的本地图片
+				const localImage =
+					resolvedIcon.kind === "image"
+						? await resolveLocalIcon(resolvedIcon.value)
+						: null;
+				return {
+					...item,
+					domain: getBooknavDomain(item.url),
+					letter: getBooknavLetter(item.title),
+					resolvedIcon,
+					localImage,
+				};
+			}),
+		),
 	})),
-}));
+);
 
 const totalCount = resolvedGroups.reduce((sum, g) => sum + g.items.length, 0);
 
